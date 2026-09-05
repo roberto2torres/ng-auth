@@ -1,6 +1,31 @@
 {
-  "name": "ng-auth",
+  "name": "@USERNAME/ng-auth",
   "version": "0.0.1",
+  "description": "Reusable Angular authentication library powered by Google Identity Services",
+  "author": "ng-auth contributors",
+  "license": "MIT",
+  "keywords": [
+    "angular",
+    "authentication",
+    "auth",
+    "google",
+    "google-sign-in",
+    "oauth",
+    "oidc",
+    "library"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/USERNAME/ng-auth.git"
+  },
+  "homepage": "https://github.com/USERNAME/ng-auth#readme",
+  "bugs": {
+    "url": "https://github.com/USERNAME/ng-auth/issues"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
+  },
   "peerDependencies": {
     "@angular/common": "^22.1.0",
     "@angular/core": "^22.1.0"

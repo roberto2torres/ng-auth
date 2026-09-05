@@ -179,10 +179,43 @@ npm run build:lib   # ng build ng-auth
 npm test            # run unit tests (Vitest)
 ```
 
-## Publishing
+## Publishing to GitHub Packages
+
+The library is pre-configured to publish to **GitHub Packages** (`publishConfig.registry`
+is set to `https://npm.pkg.github.com` and the package is scoped).
+
+### Setup (one time)
+
+1. Replace `USERNAME` with your GitHub username/org in `projects/ng-auth/package.json`
+   (`name`, `repository`, `homepage`, `bugs`).
+2. Create a GitHub repository and push the code.
+3. Create a **Personal Access Token** (GitHub → Settings → Developer settings → Tokens) with
+   the `write:packages` scope.
+
+### Publish manually
 
 ```bash
-ng build ng-auth
+npm run build:lib
+npm login --registry=https://npm.pkg.github.com   # username + PAT as password
 cd dist/ng-auth
 npm publish
+```
+
+### Publish automatically (CI)
+
+A workflow at `.github/workflows/publish.yml` builds and publishes on every `v*` tag push
+(or via manual dispatch). It uses the built-in `GITHUB_TOKEN` and derives the package name
+and version from the repository owner and tag.
+
+```bash
+npm version patch && git push --follow-tags   # bumps version and triggers the release
+```
+
+### Install from GitHub Packages
+
+Consumers must authenticate to GitHub Packages and point npm at the registry:
+
+```bash
+npm login --registry=https://npm.pkg.github.com
+npm install @USERNAME/ng-auth --registry=https://npm.pkg.github.com
 ```
