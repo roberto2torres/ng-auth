@@ -1,0 +1,12 @@
+<main class="home">
+  @if (auth.isAuthenticated()) {
+    <h1>Welcome, {{ auth.getUser()?.name }}</h1>
+    <p>{{ auth.getUser()?.email }}</p>
+    @if (auth.getUser()?.picture) {
+      <img [src]="auth.getUser()?.picture" alt="Profile picture" width="64" height="64" />
+    }
+    <button type="button" (click)="auth.logout()">Logout</button>
+  } @else {
+    <p>You are not signed in.</p>
+  }
+</main>

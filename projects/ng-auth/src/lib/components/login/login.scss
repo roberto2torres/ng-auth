@@ -1,0 +1,14 @@
+:host {
+  display: block;
+  text-align: center;
+}
+
+.ngauth-login {
+  padding: 2rem;
+
+  &__button {
+    display: flex;
+    justify-content: center;
+    margin-top: 1rem;
+  }
+}
