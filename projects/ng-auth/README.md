@@ -6,7 +6,7 @@ documentation, prerequisites, installation, and configuration.
 ## Quick start
 
 ```ts
-import { provideAuth } from 'ng-auth';
+import { provideAuth } from '@USERNAME/ng-auth';
 
 export const appConfig: ApplicationConfig = {
   providers: [
