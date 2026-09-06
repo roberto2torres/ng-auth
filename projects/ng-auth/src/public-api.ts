@@ -6,6 +6,7 @@ export * from './lib/auth.config';
 export * from './lib/models/user';
 export * from './lib/provide-auth';
 export * from './lib/services/auth.service';
+export * from './lib/services/cookie.service';
 export * from './lib/services/google-auth.service';
 export * from './lib/guards/auth.guard';
 export * from './lib/interceptor/auth.interceptor';
