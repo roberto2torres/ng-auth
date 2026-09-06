@@ -47,18 +47,14 @@ info. State is held in Signals and optionally persisted to `localStorage`.
 
 ## Install
 
-From npm:
-
-```bash
-npm install ng-auth
-```
+Install from GitHub Packages — see [Install from GitHub Packages](#install-from-github-packages).
 
 Add `provideAuth` to your application config:
 
 ```ts
 import { ApplicationConfig } from '@angular/core';
 import { provideRouter } from '@angular/router';
-import { provideAuth } from 'ng-auth';
+import { provideAuth } from '@USERNAME/ng-auth';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -107,7 +103,7 @@ app. The included demo shows one way: `scripts/generate-env.mjs` (via `npm run e
 
 ```ts
 import { Routes } from '@angular/router';
-import { LoginComponent, authGuard } from 'ng-auth';
+import { LoginComponent, authGuard } from '@USERNAME/ng-auth';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent },
@@ -120,7 +116,7 @@ export const routes: Routes = [
 
 ```ts
 import { Component, inject } from '@angular/core';
-import { AuthService } from 'ng-auth';
+import { AuthService } from '@USERNAME/ng-auth';
 
 @Component({
   selector: 'app-home',
