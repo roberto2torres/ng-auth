@@ -1,4 +1,5 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, PLATFORM_ID, computed, inject, signal } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { Router } from '@angular/router';
 import { AUTH_CONFIG, AuthConfig } from '../auth.config';
 import { UserInfo } from '../models/user';
@@ -14,6 +15,8 @@ export class AuthService {
   private readonly config = inject(AUTH_CONFIG);
   private readonly router = inject(Router);
   private readonly google = inject(GoogleAuthService);
+  private readonly platformId = inject(PLATFORM_ID);
+  private readonly isBrowser = isPlatformBrowser(this.platformId);
 
   readonly user = signal<UserInfo | null>(null);
   readonly token = signal<string | null>(null);
@@ -32,7 +35,9 @@ export class AuthService {
     this.user.set(null);
     this.token.set(null);
     this.clearStorage();
-    window.google?.accounts?.id.disableAutoSelect();
+    if (this.isBrowser) {
+      window.google?.accounts?.id.disableAutoSelect();
+    }
     void this.router.navigate([this.config.loginRoute]);
   }
 
@@ -60,7 +65,7 @@ export class AuthService {
   }
 
   private persist(value: PersistedAuth): void {
-    if (!this.config.persistToken) {
+    if (!this.isBrowser || !this.config.persistToken) {
       return;
     }
     try {
@@ -71,7 +76,7 @@ export class AuthService {
   }
 
   private readStorage(): PersistedAuth | null {
-    if (!this.config.persistToken) {
+    if (!this.isBrowser || !this.config.persistToken) {
       return null;
     }
     try {
@@ -83,6 +88,9 @@ export class AuthService {
   }
 
   private clearStorage(): void {
+    if (!this.isBrowser) {
+      return;
+    }
     try {
       localStorage.removeItem(this.storageKey);
     } catch {

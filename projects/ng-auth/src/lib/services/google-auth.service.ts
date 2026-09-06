@@ -1,4 +1,5 @@
-import { Injectable, NgZone, inject } from '@angular/core';
+import { Injectable, NgZone, PLATFORM_ID, inject } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { AUTH_CONFIG } from '../auth.config';
 import { UserInfo } from '../models/user';
 
@@ -51,12 +52,14 @@ export type GoogleCredentialCallback = (user: UserInfo, token: string) => void;
 export class GoogleAuthService {
   private readonly config = inject(AUTH_CONFIG);
   private readonly zone = inject(NgZone);
+  private readonly platformId = inject(PLATFORM_ID);
+  private readonly isBrowser = isPlatformBrowser(this.platformId);
   private loadPromise?: Promise<void>;
   private initialized = false;
   private callback?: GoogleCredentialCallback;
 
   get isLoaded(): boolean {
-    return !!window.google?.accounts?.id;
+    return this.isBrowser && !!window.google?.accounts?.id;
   }
 
   setCallback(callback: GoogleCredentialCallback): void {
@@ -102,6 +105,10 @@ export class GoogleAuthService {
   }
 
   private loadScript(): Promise<void> {
+    if (!this.isBrowser) {
+      return Promise.resolve();
+    }
+
     if (this.loadPromise) {
       return this.loadPromise;
     }
@@ -126,7 +133,7 @@ export class GoogleAuthService {
 
   private ensureInitialized(): Promise<void> {
     return this.loadScript().then(() => {
-      if (this.initialized) {
+      if (!this.isBrowser || this.initialized) {
         return;
       }
 

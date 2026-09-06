@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, ElementRef, effect, inject, output, viewChild } from '@angular/core';
+import { Component, ElementRef, afterNextRender, effect, inject, output, viewChild } from '@angular/core';
 import { GoogleAuthService } from '../../services/google-auth.service';
 import { AuthService } from '../../services/auth.service';
 
@@ -7,7 +7,7 @@ import { AuthService } from '../../services/auth.service';
   templateUrl: './login.html',
   styleUrl: './login.scss',
 })
-export class LoginComponent implements AfterViewInit {
+export class LoginComponent {
   readonly authenticated = output<void>();
 
   private readonly auth = inject(AuthService);
@@ -20,16 +20,16 @@ export class LoginComponent implements AfterViewInit {
         this.authenticated.emit();
       }
     });
-  }
 
-  ngAfterViewInit(): void {
-    const el = this.buttonRef()?.nativeElement;
-    if (el) {
-      void this.google.renderButton(el, {
-        type: 'standard',
-        theme: 'outline',
-        size: 'large',
-      });
-    }
+    afterNextRender(() => {
+      const el = this.buttonRef()?.nativeElement;
+      if (el) {
+        void this.google.renderButton(el, {
+          type: 'standard',
+          theme: 'outline',
+          size: 'large',
+        });
+      }
+    });
   }
 }
