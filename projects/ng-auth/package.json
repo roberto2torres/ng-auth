@@ -1,6 +1,6 @@
 {
   "name": "@USERNAME/ng-auth",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Reusable Angular authentication library powered by Google Identity Services",
   "author": "ng-auth contributors",
   "license": "MIT",
