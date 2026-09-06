@@ -9,10 +9,10 @@ on:
     branches:
       - main
     paths:
-      - 'projects/ng-auth/**'
-    paths-ignore:
-      - '**/*.md'
-      - '**/LICENSE'
+      - 'projects/ng-auth/src/**'
+      - 'projects/ng-auth/package.json'
+      - 'projects/ng-auth/ng-package.json'
+      - 'projects/ng-auth/tsconfig*.json'
   workflow_dispatch:
 
 jobs:
