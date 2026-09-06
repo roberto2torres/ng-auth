@@ -33,7 +33,8 @@ Once registered, it exposes:
 
 Authentication uses the official **Google Identity Services (GIS)** flow: the library loads
 the GIS script, renders the sign-in button, and decodes the returned ID token (JWT) into user
-info. State is held in Signals and optionally persisted to `localStorage`.
+info. State is held in Signals and optionally persisted to a cookie (readable during SSR so the
+guard works server-side).
 
 ## Prerequisites
 
@@ -96,8 +97,17 @@ app. The included demo shows one way: `scripts/generate-env.mjs` (via `npm run e
 | `clientId`     | `string`  | —         | Google OAuth 2.0 Client ID (required)        |
 | `loginRoute`   | `string`  | `/login`  | Redirect target for unauthenticated users    |
 | `defaultRoute` | `string`  | `/`       | Redirect target after login                  |
-| `persistToken` | `boolean` | `true`    | Persist session to `localStorage`            |
-| `storageKey`   | `string`  | `ng-auth` | `localStorage` key                           |
+| `persistToken`  | `boolean` | `true`    | Persist the session to a cookie              |
+| `cookie.name`   | `string`  | `ng-auth` | Cookie name                                  |
+| `cookie.path`   | `string`  | `/`       | Cookie path                                  |
+| `cookie.sameSite` | `'Lax' \| 'Strict' \| 'None'` | `Lax` | SameSite attribute |
+| `cookie.secure` | `boolean` | `false`   | `Secure` attribute (set `true` in production) |
+| `cookie.maxAge` | `number`  | `604800`  | Cookie lifetime in seconds (default 7 days)  |
+
+The session is stored as a cookie (not `localStorage`) so the guard can read it during
+server-side rendering. In production, set `cookie.secure: true`; leave it `false` when serving
+over plain HTTP (e.g. `ng serve` on `http://localhost:4200`). The cookie is written from the
+browser and is therefore not `HttpOnly`.
 
 ### 2. Protect routes
 

@@ -4,17 +4,14 @@ import { Router } from '@angular/router';
 import { AUTH_CONFIG, AuthConfig } from '../auth.config';
 import { UserInfo } from '../models/user';
 import { GoogleAuthService } from './google-auth.service';
-
-interface PersistedAuth {
-  user: UserInfo;
-  token: string;
-}
+import { CookieService } from './cookie.service';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly config = inject(AUTH_CONFIG);
   private readonly router = inject(Router);
   private readonly google = inject(GoogleAuthService);
+  private readonly cookies = inject(CookieService);
   private readonly platformId = inject(PLATFORM_ID);
   private readonly isBrowser = isPlatformBrowser(this.platformId);
 
@@ -34,7 +31,7 @@ export class AuthService {
   logout(): void {
     this.user.set(null);
     this.token.set(null);
-    this.clearStorage();
+    this.clearCookie();
     if (this.isBrowser) {
       window.google?.accounts?.id.disableAutoSelect();
     }
@@ -52,53 +49,45 @@ export class AuthService {
   private onAuthenticated(user: UserInfo, token: string): void {
     this.user.set(user);
     this.token.set(token);
-    this.persist({ user, token });
+    this.persist(token);
     void this.router.navigate([this.config.defaultRoute]);
   }
 
   private restore(): void {
-    const persisted = this.readStorage();
-    if (persisted) {
-      this.user.set(persisted.user);
-      this.token.set(persisted.token);
+    if (!this.config.persistToken) {
+      return;
     }
-  }
-
-  private persist(value: PersistedAuth): void {
-    if (!this.isBrowser || !this.config.persistToken) {
+    const token = this.cookies.get(this.cookieName);
+    if (!token) {
       return;
     }
     try {
-      localStorage.setItem(this.storageKey, JSON.stringify(value));
+      this.user.set(this.google.decodeCredential(token));
+      this.token.set(token);
     } catch {
-      // storage unavailable (e.g. private mode); ignore
+      // invalid token; ignore
     }
   }
 
-  private readStorage(): PersistedAuth | null {
+  private persist(token: string): void {
     if (!this.isBrowser || !this.config.persistToken) {
-      return null;
+      return;
     }
-    try {
-      const raw = localStorage.getItem(this.storageKey);
-      return raw ? (JSON.parse(raw) as PersistedAuth) : null;
-    } catch {
-      return null;
-    }
+    this.cookies.set(this.cookieName, token, this.cookieOptions);
   }
 
-  private clearStorage(): void {
+  private clearCookie(): void {
     if (!this.isBrowser) {
       return;
     }
-    try {
-      localStorage.removeItem(this.storageKey);
-    } catch {
-      // ignore
-    }
+    this.cookies.remove(this.cookieName, this.cookieOptions);
   }
 
-  private get storageKey(): string {
-    return this.config.storageKey ?? 'ng-auth';
+  private get cookieName(): string {
+    return this.config.cookie?.name ?? 'ng-auth';
+  }
+
+  private get cookieOptions() {
+    return this.config.cookie;
   }
 }
