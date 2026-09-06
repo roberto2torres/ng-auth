@@ -105,6 +105,10 @@ export class GoogleAuthService {
     };
   }
 
+  private isFedCmSupported(): boolean {
+    return this.isBrowser && 'IdentityCredential' in window;
+  }
+
   private loadScript(): Promise<void> {
     if (!this.isBrowser) {
       return Promise.resolve();
@@ -138,12 +142,16 @@ export class GoogleAuthService {
         return;
       }
 
-      window.google?.accounts?.id.initialize({
+      const config: GoogleIdConfiguration = {
         client_id: this.config.clientId,
         callback: (response: GoogleCredentialResponse) =>
           this.handleCredential(response),
-        use_fedcm_for_button: true,
-      });
+      };
+      if (this.isFedCmSupported()) {
+        config.use_fedcm_for_button = true;
+      }
+
+      window.google?.accounts?.id.initialize(config);
 
       this.initialized = true;
     });
