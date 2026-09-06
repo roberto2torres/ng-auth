@@ -179,10 +179,51 @@ npm run build:lib   # ng build ng-auth
 npm test            # run unit tests (Vitest)
 ```
 
-## Publishing
+## Publishing to GitHub Packages
+
+The library is pre-configured to publish to **GitHub Packages** (`publishConfig.registry`
+is set to `https://npm.pkg.github.com` and the package is scoped).
+
+### Setup (one time)
+
+1. Replace `USERNAME` with your GitHub username/org in `projects/ng-auth/package.json`
+   (`name`, `repository`, `homepage`, `bugs`).
+2. Create a GitHub repository and push the code.
+3. Create a **Personal Access Token** (GitHub → Settings → Developer settings → Tokens) with
+   the `write:packages` scope.
+
+### Publish manually
 
 ```bash
-ng build ng-auth
+npm run build:lib
+npm login --registry=https://npm.pkg.github.com   # username + PAT as password
 cd dist/ng-auth
 npm publish
+```
+
+### Publish automatically (CI)
+
+A workflow at `.github/workflows/publish.yml` builds and publishes the library to GitHub
+Packages automatically. It uses the built-in `GITHUB_TOKEN` and derives the package scope
+from the repository owner. It triggers on:
+
+- **Pull request merged to `main`** — publishes the version already set in
+  `projects/ng-auth/package.json`. Bump the version in the PR before merging, otherwise the
+  publish fails if that version already exists.
+- **`v*` tag push** — publishes using the tag as the version (e.g. `v1.2.0` → `1.2.0`).
+- **Manual dispatch** — from the Actions tab ("Run workflow").
+
+Example release flow via tags:
+
+```bash
+npm version patch && git push --follow-tags   # bumps version and triggers the release
+```
+
+### Install from GitHub Packages
+
+Consumers must authenticate to GitHub Packages and point npm at the registry:
+
+```bash
+npm login --registry=https://npm.pkg.github.com
+npm install @USERNAME/ng-auth --registry=https://npm.pkg.github.com
 ```

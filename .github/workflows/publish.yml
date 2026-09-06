@@ -1,0 +1,49 @@
+name: Publish to GitHub Packages
+
+on:
+  push:
+    tags:
+      - 'v*'
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  publish:
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'push' ||
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://npm.pkg.github.com
+          scope: '@${{ github.repository_owner }}'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build library
+        run: npm run build:lib
+
+      - name: Publish
+        working-directory: dist/ng-auth
+        run: |
+          npm pkg set name="@${{ github.repository_owner }}/ng-auth"
+          if [ "${{ github.event_name }}" = "push" ]; then
+            npm pkg set version="${GITHUB_REF_NAME#v}"
+          fi
+          npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
