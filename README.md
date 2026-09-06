@@ -203,9 +203,17 @@ npm publish
 
 ### Publish automatically (CI)
 
-A workflow at `.github/workflows/publish.yml` builds and publishes on every `v*` tag push
-(or via manual dispatch). It uses the built-in `GITHUB_TOKEN` and derives the package name
-and version from the repository owner and tag.
+A workflow at `.github/workflows/publish.yml` builds and publishes the library to GitHub
+Packages automatically. It uses the built-in `GITHUB_TOKEN` and derives the package scope
+from the repository owner. It triggers on:
+
+- **Pull request merged to `main`** — publishes the version already set in
+  `projects/ng-auth/package.json`. Bump the version in the PR before merging, otherwise the
+  publish fails if that version already exists.
+- **`v*` tag push** — publishes using the tag as the version (e.g. `v1.2.0` → `1.2.0`).
+- **Manual dispatch** — from the Actions tab ("Run workflow").
+
+Example release flow via tags:
 
 ```bash
 npm version patch && git push --follow-tags   # bumps version and triggers the release
