@@ -8,6 +8,11 @@ on:
     types: [closed]
     branches:
       - main
+    paths:
+      - 'projects/ng-auth/**'
+    paths-ignore:
+      - '**/*.md'
+      - '**/LICENSE'
   workflow_dispatch:
 
 jobs:
