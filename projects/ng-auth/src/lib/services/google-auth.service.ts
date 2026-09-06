@@ -14,6 +14,7 @@ interface GoogleIdConfiguration {
   callback: (response: GoogleCredentialResponse) => void;
   auto_select?: boolean;
   cancel_on_tap_outside?: boolean;
+  use_fedcm_for_button?: boolean;
 }
 
 interface GoogleButtonOptions {
@@ -141,6 +142,7 @@ export class GoogleAuthService {
         client_id: this.config.clientId,
         callback: (response: GoogleCredentialResponse) =>
           this.handleCredential(response),
+        use_fedcm_for_button: true,
       });
 
       this.initialized = true;
