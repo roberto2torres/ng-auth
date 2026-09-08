@@ -13,6 +13,7 @@ export const appConfig: ApplicationConfig = {
     provideRouter(routes),
     provideAuth({
       clientId: 'YOUR_GOOGLE_CLIENT_ID',
+      authApiUrl: 'https://us-central1-YOUR_PROJECT.cloudfunctions.net',
       loginRoute: '/login',
       defaultRoute: '/',
     }),
@@ -23,10 +24,10 @@ export const appConfig: ApplicationConfig = {
 ## Exports
 
 - `provideAuth` — configures the library
-- `AuthService` — `user`, `token`, `isAuthenticated`, `login()`, `logout()`
-- `LoginComponent` — `ngauth-login` Google sign-in button
+- `AuthService` — `user`, `initialized`, `isAuthenticated`, `login()`, `logout()`
+- `LoginComponent` — `ngauth-login` sign-in button (starts the redirect)
 - `authGuard` — functional route guard
-- `authInterceptor` — attaches the auth token to HTTP requests
+- `authInterceptor` — sends cookies and refreshes the token on `401`
 - `AuthConfig`, `AUTH_CONFIG`, `UserInfo`
 
 ## Building

@@ -1,42 +1,25 @@
-import { Injectable, NgZone, PLATFORM_ID, inject } from '@angular/core';
+import { Injectable, PLATFORM_ID, inject } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { AUTH_CONFIG } from '../auth.config';
-import { UserInfo } from '../models/user';
 
-interface GoogleCredentialResponse {
-  credential: string;
-  select_by?: string;
-  clientId?: string;
+interface GoogleOAuth2Client {
+  requestCode(): void;
 }
 
-interface GoogleIdConfiguration {
+interface GoogleCodeClientOptions {
   client_id: string;
-  callback: (response: GoogleCredentialResponse) => void;
-  auto_select?: boolean;
-  cancel_on_tap_outside?: boolean;
-  use_fedcm_for_button?: boolean;
+  scope: string;
+  ux_mode: 'redirect';
+  redirect_uri: string;
+  state: string;
 }
 
-interface GoogleButtonOptions {
-  type?: string;
-  theme?: string;
-  size?: string;
-  text?: string;
-  shape?: string;
-  logo_alignment?: string;
-  width?: number;
-  locale?: string;
-}
-
-interface GoogleAccountsId {
-  initialize(config: GoogleIdConfiguration): void;
-  renderButton(parent: HTMLElement, options?: GoogleButtonOptions): void;
-  prompt(callback?: (notification?: unknown) => void): void;
-  disableAutoSelect(): void;
+interface GoogleAccountsOAuth2 {
+  initCodeClient(options: GoogleCodeClientOptions): GoogleOAuth2Client;
 }
 
 interface GoogleAccounts {
-  id: GoogleAccountsId;
+  oauth2: GoogleAccountsOAuth2;
 }
 
 declare global {
@@ -46,67 +29,66 @@ declare global {
 }
 
 const GOOGLE_GIS_URL = 'https://accounts.google.com/gsi/client';
-
-export type GoogleCredentialCallback = (user: UserInfo, token: string) => void;
+const STATE_STORAGE_KEY = 'ng-auth.state';
 
 @Injectable({ providedIn: 'root' })
 export class GoogleAuthService {
   private readonly config = inject(AUTH_CONFIG);
-  private readonly zone = inject(NgZone);
   private readonly platformId = inject(PLATFORM_ID);
   private readonly isBrowser = isPlatformBrowser(this.platformId);
   private loadPromise?: Promise<void>;
-  private initialized = false;
-  private callback?: GoogleCredentialCallback;
 
-  get isLoaded(): boolean {
-    return this.isBrowser && !!window.google?.accounts?.id;
-  }
-
-  setCallback(callback: GoogleCredentialCallback): void {
-    this.callback = callback;
-  }
-
-  renderButton(parent: HTMLElement, options?: GoogleButtonOptions): Promise<void> {
-    return this.ensureInitialized().then(() => {
-      window.google?.accounts?.id.renderButton(parent, options);
+  login(): void {
+    void this.ensureLoaded().then(() => {
+      if (!this.isBrowser || !window.google?.accounts?.oauth2) {
+        return;
+      }
+      const state = this.generateState();
+      const client = window.google.accounts.oauth2.initCodeClient({
+        client_id: this.config.clientId,
+        scope: 'openid email profile',
+        ux_mode: 'redirect',
+        redirect_uri: `${this.config.authApiUrl}/auth/callback`,
+        state,
+      });
+      client.requestCode();
     });
   }
 
-  prompt(): Promise<void> {
-    return this.ensureInitialized().then(() => {
-      window.google?.accounts?.id.prompt();
-    });
+  validateReturningState(): void {
+    if (!this.isBrowser) {
+      return;
+    }
+    const expected = this.readStoredState();
+    if (expected === null) {
+      return;
+    }
+    const params = new URLSearchParams(window.location.search);
+    const actual = params.get('state');
+    if (actual !== expected) {
+      console.warn('[ng-auth] OAuth state mismatch — possible CSRF attempt.');
+    }
+    this.clearStoredState();
   }
 
-  decodeCredential(idToken: string): UserInfo {
-    const [, payload] = idToken.split('.');
-    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
-    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
-    const bytes = Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
-    const decoded = JSON.parse(new TextDecoder().decode(bytes)) as {
-      sub: string;
-      name?: string;
-      given_name?: string;
-      family_name?: string;
-      email?: string;
-      email_verified?: boolean;
-      picture?: string;
-    };
-
-    return {
-      sub: decoded.sub,
-      name: decoded.name,
-      givenName: decoded.given_name,
-      familyName: decoded.family_name,
-      email: decoded.email,
-      emailVerified: decoded.email_verified,
-      picture: decoded.picture,
-    };
+  private generateState(): string {
+    const array = new Uint8Array(32);
+    crypto.getRandomValues(array);
+    const state = Array.from(array, (b) => b.toString(16).padStart(2, '0')).join('');
+    this.storeState(state);
+    return state;
   }
 
-  private isFedCmSupported(): boolean {
-    return this.isBrowser && 'IdentityCredential' in window;
+  private storeState(state: string): void {
+    sessionStorage.setItem(STATE_STORAGE_KEY, state);
+  }
+
+  private readStoredState(): string | null {
+    return sessionStorage.getItem(STATE_STORAGE_KEY);
+  }
+
+  private clearStoredState(): void {
+    sessionStorage.removeItem(STATE_STORAGE_KEY);
   }
 
   private loadScript(): Promise<void> {
@@ -119,7 +101,7 @@ export class GoogleAuthService {
     }
 
     this.loadPromise = new Promise<void>((resolve, reject) => {
-      if (this.isLoaded) {
+      if (window.google?.accounts?.oauth2) {
         resolve();
         return;
       }
@@ -136,29 +118,7 @@ export class GoogleAuthService {
     return this.loadPromise;
   }
 
-  private ensureInitialized(): Promise<void> {
-    return this.loadScript().then(() => {
-      if (!this.isBrowser || this.initialized) {
-        return;
-      }
-
-      const config: GoogleIdConfiguration = {
-        client_id: this.config.clientId,
-        callback: (response: GoogleCredentialResponse) =>
-          this.handleCredential(response),
-      };
-      if (this.isFedCmSupported()) {
-        config.use_fedcm_for_button = true;
-      }
-
-      window.google?.accounts?.id.initialize(config);
-
-      this.initialized = true;
-    });
-  }
-
-  private handleCredential(response: GoogleCredentialResponse): void {
-    const user = this.decodeCredential(response.credential);
-    this.zone.run(() => this.callback?.(user, response.credential));
+  private ensureLoaded(): Promise<void> {
+    return this.loadScript();
   }
 }
