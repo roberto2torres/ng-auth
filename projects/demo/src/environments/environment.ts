@@ -2,6 +2,7 @@
 // Do not edit it directly.
 export const environment = {
   googleClientId: "162320412399-519kqsbii5ls83a1gdo9s3mqub6egn0c.apps.googleusercontent.com",
+  authApiUrl: "",
   loginRoute: "/login",
   defaultRoute: "/",
 };

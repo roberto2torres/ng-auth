@@ -1,11 +1,13 @@
 # ng-auth
 
-A reusable Angular authentication library powered by Google Identity Services.
+A reusable Angular authentication library powered by Google's OAuth 2.0 authorization-code
+flow with backend-issued, HttpOnly session cookies.
 
 - Route guard that redirects unauthenticated users to a login route
-- `ngauth-login` component with the official "Sign in with Google" button
-- Signals-based auth state and user info service
-- HTTP interceptor that attaches the auth token to requests
+- `ngauth-login` component that starts a full-page "Sign in with Google" redirect
+- Signals-based auth state populated from `GET /auth/me`
+- HTTP interceptor that sends cookies (`withCredentials`) and refreshes the access token
+  automatically on `401`
 - DI-token configuration with a `.env` template for secrets
 
 Built for **Angular 22** using standalone components, Signals, and functional guards.
@@ -15,36 +17,61 @@ Built for **Angular 22** using standalone components, Signals, and functional gu
 `ng-auth` handles authentication end-to-end with a single provider function:
 
 ```ts
-provideAuth({ clientId: '...' })
+provideAuth({ clientId: '...', authApiUrl: 'https://...' })
 ```
 
 Once registered, it exposes:
 
-| Export              | Type                     | Purpose                                                     |
-| ------------------- | ------------------------ | ----------------------------------------------------------- |
-| `provideAuth`       | function                 | Configures the library via DI                               |
-| `AuthService`       | injectable service       | User/token state, `login()`, `logout()`                     |
-| `LoginComponent`    | standalone component     | Google sign-in button (`ngauth-login`)                      |
-| `authGuard`         | `CanActivateFn`          | Blocks routes for unauthenticated users                     |
-| `authInterceptor`   | `HttpInterceptorFn`      | Adds `Authorization: Bearer <token>` to HTTP requests       |
-| `AuthConfig`        | interface                | Configuration shape                                         |
-| `AUTH_CONFIG`       | `InjectionToken`         | Raw config token (advanced use)                             |
-| `UserInfo`          | interface                | Decoded user info (`sub`, `name`, `email`, `picture`, ...)  |
+| Export              | Type                   | Purpose                                                        |
+| ------------------- | ---------------------- | -------------------------------------------------------------- |
+| `provideAuth`       | function               | Configures the library via DI                                  |
+| `AuthService`       | injectable service     | `user`, `initialized`, `isAuthenticated`, `login()`, `logout()` |
+| `LoginComponent`    | standalone component   | Sign-in button (`ngauth-login`) that starts the redirect       |
+| `authGuard`         | `CanActivateFn`        | Blocks routes for unauthenticated users                        |
+| `authInterceptor`   | `HttpInterceptorFn`    | Sends cookies + refresh-on-401                                 |
+| `SKIP_REFRESH`      | `HttpContextToken`     | Marks `/auth/*` requests to skip refresh (advanced use)        |
+| `AuthConfig`        | interface              | Configuration shape                                            |
+| `AUTH_CONFIG`       | `InjectionToken`       | Raw config token (advanced use)                                |
+| `UserInfo`          | interface              | User info (`sub`, `name`, `email`, `picture`, ...)             |
 
-Authentication uses the official **Google Identity Services (GIS)** flow: the library loads
-the GIS script, renders the sign-in button, and decodes the returned ID token (JWT) into user
-info. State is held in Signals and optionally persisted to a cookie (readable during SSR so the
-guard works server-side).
+### How it works
+
+The library uses Google's **authorization-code flow** (`ux_mode: 'redirect'`) plus a backend that
+issues its own token pair as **HttpOnly cookies**:
+
+1. `login()` redirects the browser to Google's consent screen.
+2. Google redirects to `{authApiUrl}/auth/callback?code=…&state=…`.
+3. The backend exchanges the code, sets HttpOnly cookies, and redirects to `defaultRoute`.
+4. The library loads the user from `GET /auth/me` (cookies are sent automatically).
+5. When any API returns `401`, the interceptor calls `POST /auth/refresh` once and retries the
+   original request. A failed refresh logs the user out.
+
+The library never reads or writes auth cookies and never stores tokens in JavaScript.
 
 ## Prerequisites
 
 - **Node.js** 20+ (tested on Node 24) and **npm** 10+
 - **Angular 22+** project (standalone components)
 - A **Google Cloud** project with an **OAuth 2.0 Web application** Client ID
+- A backend exposing the `/auth/*` endpoints described below
 - The following added to your OAuth client in the
   [Google Cloud Console](https://console.cloud.google.com/):
   - **Authorized JavaScript origins**: `http://localhost:4200` (and your production domain)
-  - **Authorized redirect URIs**: `http://localhost:4200` (and your production domain)
+  - **Authorized redirect URIs**: `{authApiUrl}/auth/callback`
+
+## Backend contract
+
+All endpoints live under `{authApiUrl}` and use cookies (sent automatically with
+`withCredentials: true`):
+
+| Method | Path            | Description                                        |
+| ------ | --------------- | -------------------------------------------------- |
+| `GET`  | `/auth/me`      | Returns `200 { user: UserInfo }` or `401`          |
+| `POST` | `/auth/refresh` | Rotates the refresh token, sets a new access token |
+| `POST` | `/auth/logout`  | Revokes tokens and clears cookies (`204`)          |
+| `GET`  | `/auth/callback`| Exchanges `?code` and redirects to the frontend    |
+
+`UserInfo` shape: `{ sub, name?, givenName?, familyName?, email?, emailVerified?, picture? }`.
 
 ## Install
 
@@ -62,6 +89,7 @@ export const appConfig: ApplicationConfig = {
     provideRouter(routes),
     provideAuth({
       clientId: 'YOUR_GOOGLE_CLIENT_ID',
+      authApiUrl: 'https://us-central1-YOUR_PROJECT.cloudfunctions.net',
       loginRoute: '/login',
       defaultRoute: '/',
     }),
@@ -81,6 +109,7 @@ cp .env.example .env
 
 ```dotenv
 GOOGLE_CLIENT_ID=xxxxxxxxxxxx.apps.googleusercontent.com
+NG_AUTH_API_URL=https://us-central1-YOUR_PROJECT.cloudfunctions.net
 NG_AUTH_LOGIN_ROUTE=/login
 NG_AUTH_DEFAULT_ROUTE=/
 ```
@@ -92,22 +121,15 @@ app. The included demo shows one way: `scripts/generate-env.mjs` (via `npm run e
 
 `AuthConfig` options:
 
-| Field          | Type      | Default   | Description                                  |
-| -------------- | --------- | --------- | -------------------------------------------- |
-| `clientId`     | `string`  | —         | Google OAuth 2.0 Client ID (required)        |
-| `loginRoute`   | `string`  | `/login`  | Redirect target for unauthenticated users    |
-| `defaultRoute` | `string`  | `/`       | Redirect target after login                  |
-| `persistToken`  | `boolean` | `true`    | Persist the session to a cookie              |
-| `cookie.name`   | `string`  | `ng-auth` | Cookie name                                  |
-| `cookie.path`   | `string`  | `/`       | Cookie path                                  |
-| `cookie.sameSite` | `'Lax' \| 'Strict' \| 'None'` | `Lax` | SameSite attribute |
-| `cookie.secure` | `boolean` | `false`   | `Secure` attribute (set `true` in production) |
-| `cookie.maxAge` | `number`  | `604800`  | Cookie lifetime in seconds (default 7 days)  |
+| Field          | Type     | Default  | Description                                   |
+| -------------- | -------- | -------- | --------------------------------------------- |
+| `clientId`     | `string` | —        | Google OAuth 2.0 Client ID (required)         |
+| `authApiUrl`   | `string` | —        | Backend base URL for `/auth/*` (required)     |
+| `loginRoute`   | `string` | `/login` | Redirect target for unauthenticated users     |
+| `defaultRoute` | `string` | `/`      | Redirect target after login                   |
 
-The session is stored as a cookie (not `localStorage`) so the guard can read it during
-server-side rendering. In production, set `cookie.secure: true`; leave it `false` when serving
-over plain HTTP (e.g. `ng serve` on `http://localhost:4200`). The cookie is written from the
-browser and is therefore not `HttpOnly`.
+Auth cookies are **HttpOnly** and managed entirely by the backend. There is no client-side
+cookie or token configuration.
 
 ### 2. Protect routes
 
@@ -121,6 +143,9 @@ export const routes: Routes = [
   { path: '', redirectTo: 'home', pathMatch: 'full' },
 ];
 ```
+
+The guard waits for the initial `GET /auth/me` to resolve before deciding, so it won't bounce
+users to `/login` prematurely after a fresh login redirect.
 
 ### 3. Read user info
 
@@ -147,23 +172,23 @@ export class HomeComponent {
 `AuthService` members:
 
 - `user: Signal<UserInfo | null>`
-- `token: Signal<string | null>`
+- `initialized: Signal<boolean>` — true once the initial `/auth/me` has resolved
 - `isAuthenticated: Signal<boolean>`
-- `login(): void` — triggers the Google prompt
-- `logout(): void` — clears state and redirects to `loginRoute`
+- `login(): void` — starts the Google authorization-code redirect
+- `logout(): void` — calls `/auth/logout`, clears state, redirects to `loginRoute`
 - `getUser(): UserInfo | null`
-- `getToken(): string | null`
 
 ### 4. Authenticated HTTP requests
 
-`provideAuth` registers an interceptor that automatically attaches the token:
+`provideAuth` registers an interceptor that adds `withCredentials: true` to every request and
+automatically refreshes the access token when a request fails with `401`:
 
-```ts
-Authorization: Bearer <id-token>
-```
+- On `401`, it calls `POST /auth/refresh` once (concurrent `401`s share a single in-flight
+  refresh), then retries the original request.
+- If refresh fails, it logs the user out and redirects to `loginRoute`.
 
-No extra setup is required — inject `HttpClient` as usual and the header is added when a user
-is authenticated.
+No `Authorization` header is attached — authentication is cookie-based. Inject `HttpClient` as
+usual.
 
 ## Demo
 

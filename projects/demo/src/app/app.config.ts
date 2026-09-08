@@ -10,6 +10,7 @@ export const appConfig: ApplicationConfig = {
     provideRouter(routes),
     provideAuth({
       clientId: environment.googleClientId,
+      authApiUrl: environment.authApiUrl,
       loginRoute: environment.loginRoute,
       defaultRoute: environment.defaultRoute,
     }),
